@@ -3,6 +3,7 @@ from io import BytesIO
 from pdfminer.high_level import extract_text
 import trafilatura
 from playwright.sync_api import sync_playwright
+from model import *
 
 HEADERS = {
     "User-Agent": (
@@ -11,6 +12,8 @@ HEADERS = {
         "Chrome/118.0.0.0 Safari/537.36"
     )
 }
+
+SEARX_HOST = "http://127.0.0.1:8080"
 
 
 def fetch_rendered_text(url: str) -> str | None:
@@ -28,8 +31,15 @@ def fetch_rendered_text(url: str) -> str | None:
     return text
 
 
-def fetch_text_from_url(url: str) -> str:
-    """Download URL and extract clean text (PDF -> pdfminer, HTML -> trafilatura). Fallback to playwright or if JS text detected."""
+# SUB-TOOL
+def get_url_content(url: str) -> str:
+    """Extract **text** content from url
+    Args:
+        url (str): web page url
+
+    Returns:
+        str: text content from web page
+    """
 
     # HEAD request to check content type (like curl -I -L -A)
     head = requests.head(url, headers=HEADERS, allow_redirects=True, timeout=15)
@@ -55,8 +65,32 @@ def fetch_text_from_url(url: str) -> str:
     # Case 3: Fallback → Playwright (JS-heavy site)
     return fetch_rendered_text(url) or ""
 
-if __name__ == "__main__":
-    url = "https://arxiv.org/pdf/2402.06196"
 
-    text = fetch_text_from_url(url)
+# MAIN-TOOL
+def web_search(
+        query: str,
+        time_range: Optional[Literal["day", "month", "year"]] = None,
+        format: Literal["json"] = "json",
+        full_content: bool = False,
+        max_results: int = 4
+        ) -> SearchResults:
+    """Returns search results from web.
+
+    Args:
+        query (str): Search query.
+        time_range (Optional[Literal[&quot;day&quot;, &quot;month&quot;, &quot;year&quot;]], optional): Get results from last day/month/year. Defaults to None.
+        format (Literal[&quot;json&quot;], optional): Search result format. Defaults to "json".
+        full_content (bool, optional): Whether to include full content from url or just snippets. Defaults to False.
+        max_results (int, optional): Top n search results. Defaults to 4.
+
+    Returns:
+        SearchResults: Object
+    """
+    
+
+
+if __name__ == "__main__":
+    url = "https://docs.pydantic.dev/latest/logo-white.svg"
+
+    text = get_url_content(url)
     print(text)

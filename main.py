@@ -1,9 +1,10 @@
-import requests
 from io import BytesIO
-from pdfminer.high_level import extract_text
+from typing import Literal, Optional
+
+import requests
 import trafilatura
+from pdfminer.high_level import extract_text
 from playwright.sync_api import sync_playwright
-from model import *
 
 HEADERS = {
     "User-Agent": (
@@ -42,13 +43,17 @@ def get_url_content(url: str) -> str:
     """
 
     # HEAD request to check content type (like curl -I -L -A)
-    head = requests.head(url, headers=HEADERS, allow_redirects=True, timeout=15)
-    content_type = head.headers.get("Content-Type", "").lower()
+    head: requests.Response = requests.head(
+        url, headers=HEADERS, allow_redirects=True, timeout=15
+    )
+    content_type: str = head.headers.get("Content-Type", "").lower()
 
     # Case 1: PDF
     if "pdf" in content_type:
         print("[ pdf detected ]")
-        r = requests.get(url, headers=HEADERS, allow_redirects=True, timeout=30)
+        r: requests.Response = requests.get(
+            url, headers=HEADERS, allow_redirects=True, timeout=30
+        )
         text = extract_text(BytesIO(r.content))
         return text.strip()
 
@@ -58,7 +63,10 @@ def get_url_content(url: str) -> str:
         if downloaded:
             text = trafilatura.extract(downloaded)
             if text:
-                if "enable javascript" in text.lower() or "javascript to run this app" in text.lower():
+                if (
+                    "enable javascript" in text.lower()
+                    or "javascript to run this app" in text.lower()
+                ):
                     text = fetch_rendered_text(url) or ""
                 return text.strip()
 
@@ -68,12 +76,12 @@ def get_url_content(url: str) -> str:
 
 # MAIN-TOOL
 def web_search(
-        query: str,
-        time_range: Optional[Literal["day", "month", "year"]] = None,
-        format: Literal["json"] = "json",
-        full_content: bool = False,
-        max_results: int = 4
-        ) -> SearchResults:
+    query: str,
+    time_range: Optional[Literal["day", "month", "year"]] = None,
+    format: Literal["json"] = "json",
+    full_content: bool = False,
+    max_results: int = 4,
+) -> str:
     """Returns search results from web.
 
     Args:
@@ -84,13 +92,16 @@ def web_search(
         max_results (int, optional): Top n search results. Defaults to 4.
 
     Returns:
-        SearchResults: Object
+        str: Search results.
     """
-    
 
 
 if __name__ == "__main__":
     url = "https://docs.pydantic.dev/latest/logo-white.svg"
 
     text = get_url_content(url)
+    print(text)
+    print(text)
+    print(text)
+    print(text)
     print(text)

@@ -1,5 +1,5 @@
 from typing import Literal, Optional, List
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class BaseSearch(BaseModel):
@@ -35,12 +35,19 @@ class WebSearch(BaseSearch):
 
 
 class Result(BaseModel):
-    url: str
+    url: str = Field(..., alias="href")
     title: str
-    snippet: str = Field(..., description="Short snippet from web page")
-    content: Optional[str] = Field(
+    snippet: Optional[str] = Field(..., description="Short snippet from web page")
+    full_content: Optional[str] = Field(
         None, description="Fully extracted text content from webpage"
     )
+
+    @model_validator(mode="before")
+    def handle_aliases(cls, values):
+        if "body" in values:
+            values["snippet"] = values["body"]
+        elif "content" in values:
+            values["snippet"] = values["content"]
 
 
 class SearchResults(BaseModel):
@@ -58,7 +65,7 @@ class SearchResults(BaseModel):
         for res in self.results:
             text += f"\nurl: {res.url}"
             if res.content:
-                text += f"\ncontent: {res.content}"
+                text += f"\ncontent: {res.full_content}"
             else:
                 text += f"\ncontent snippet: {res.snippet}"
             text += "\n---"

@@ -1,10 +1,22 @@
+import json
+import logging
 from io import BytesIO
-from typing import Literal, Optional
+from pathlib import Path
+from typing import List, Literal, Optional
 
 import requests
 import trafilatura
 from pdfminer.high_level import extract_text
 from playwright.sync_api import sync_playwright
+
+from model import Result, SearchResults
+
+logger = logging.getLogger(Path(__file__).stem)
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 
 HEADERS = {
     "User-Agent": (
@@ -15,6 +27,58 @@ HEADERS = {
 }
 
 SEARX_HOST = "http://127.0.0.1:8080"
+
+class WebSearchAgent():
+
+    _TIME_RANGE = Literal["day", "month", "year", "d", "w", "m", "y"]
+
+    def __init__(self,
+                 query: Optional[str] = "",
+                 time_range: Optional[_TIME_RANGE] = None,
+                 max_results: int = 4,
+                 agent: Literal["searxng", "ddgs"] = "searxng"):
+        self.query = query
+        self.time_range = time_range
+        self.max_results = max_results
+        self.agent = self._check_agent(agent)
+        self.switch_and_retry = True
+
+    def _check_agent(self, agent: str):
+        """Returns 
+        """
+        res = requests.get("http://127.0.0.1:8080/config")
+        if res.ok and ("engines" in res.text):
+            logger.debug("Using Searxng Host to search")
+            return self.searxng_search
+        else:
+            logger.debug("Using DDGS to seach")
+            return
+        
+    def searxng_search(self, query: Optional[str] = None) -> List[Result] | None:
+        if query is not None:
+            self.query = query
+        if not self.query.strip():
+            error_msg = "Search query cannot be NULL"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        # ------------------ SEARCH REQUEST ----------------------
+        res = requests.get(url, params={"q": query, "time_range": self.time_range,"format": "json"})
+        if res.status_code == 200:
+            results_dict: dict = json.loads(res.text)
+            results = results_dict.get("results", [])
+            logger.debug(f"Searxng returned {len(results)} results")
+            self.switch_and_retry = True # reset in case same instance is reused
+            return [Result(**result) for result in results][:self.max_results]
+        else:
+            logger.error(f"Searxng response code {res.status_code}: {res.text}")
+            if self.switch_and_retry:
+                logger.info("Retrying with DDGS")
+
+
+
+
+
+
 
 
 def fetch_rendered_text(url: str) -> str | None:
@@ -78,9 +142,8 @@ def get_url_content(url: str) -> str:
 def web_search(
     query: str,
     time_range: Optional[Literal["day", "month", "year"]] = None,
-    format: Literal["json"] = "json",
     full_content: bool = False,
-    max_results: int = 4,
+    max_results: int = 5,
 ) -> str:
     """Returns search results from web.
 
@@ -88,7 +151,6 @@ def web_search(
         query (str): Search query.
         time_range (Optional[Literal[&quot;day&quot;, &quot;month&quot;, &quot;year&quot;]], optional): Get results from last day/month/year. Defaults to None.
         format (Literal[&quot;json&quot;], optional): Search result format. Defaults to "json".
-        full_content (bool, optional): Whether to include full content from url or just snippets. Defaults to False.
         max_results (int, optional): Top n search results. Defaults to 4.
 
     Returns:
@@ -99,9 +161,6 @@ def web_search(
 if __name__ == "__main__":
     url = "https://docs.pydantic.dev/latest/logo-white.svg"
 
-    text = get_url_content(url)
-    print(text)
-    print(text)
-    print(text)
-    print(text)
-    print(text)
+    # text = get_url_content(url)
+    # print(text)
+    print(__name__)

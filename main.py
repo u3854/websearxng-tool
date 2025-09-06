@@ -3,13 +3,12 @@ import logging
 from io import BytesIO
 from pathlib import Path
 from typing import List, Literal, Optional
-
+import ddgs
 import requests
 import trafilatura
 from pdfminer.high_level import extract_text
 from playwright.sync_api import sync_playwright
-
-from model import Result, SearchResults
+from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger(Path(__file__).stem)
 
@@ -28,25 +27,47 @@ HEADERS = {
 
 SEARX_HOST = "http://127.0.0.1:8080"
 
+
+class Result(BaseModel):
+    url: str = Field(..., alias="href")
+    title: str
+    snippet: Optional[str] = Field(..., description="Short snippet from web page")
+    full_content: Optional[str] = Field(
+        None, description="Fully extracted text content from webpage"
+    )
+
+    @model_validator(mode="before")
+    def handle_aliases(cls, values):
+        if "body" in values:
+            values["snippet"] = values["body"]
+        elif "content" in values:
+            values["snippet"] = values["content"]
+
+
+# -----------------------------------------------------------------------
+
 class WebSearchAgent():
 
-    _TIME_RANGE = Literal["day", "month", "year", "d", "w", "m", "y"]
-
+    _TIME_RANGE = Literal["day", "month", "year"]
+    _AGENTS = Literal["searxng", "ddgs"]
     def __init__(self,
                  query: Optional[str] = "",
                  time_range: Optional[_TIME_RANGE] = None,
                  max_results: int = 4,
-                 agent: Literal["searxng", "ddgs"] = "searxng"):
+                 agent: _AGENTS = "searxng"):
         self.query = query
         self.time_range = time_range
         self.max_results = max_results
         self.agent = self._check_agent(agent)
         self.switch_and_retry = True
 
-    def _check_agent(self, agent: str):
-        """Returns 
+
+    def _check_agent(self, agent: _AGENTS):
+        """Returns the search agent instance
         """
-        res = requests.get("http://127.0.0.1:8080/config")
+        if agent == "ddgs":
+            return self.ddgs_search
+        res = requests.get(SEARX_HOST + "/config")
         if res.ok and ("engines" in res.text):
             logger.debug("Using Searxng Host to search")
             return self.searxng_search
@@ -54,6 +75,13 @@ class WebSearchAgent():
             logger.debug("Using DDGS to seach")
             return
         
+    def _searxng_params(self) -> dict:
+        return {
+            "q": self.query,
+            "format": "json",
+            "time_range": self.time_range
+        }
+
     def searxng_search(self, query: Optional[str] = None) -> List[Result] | None:
         if query is not None:
             self.query = query
@@ -62,22 +90,59 @@ class WebSearchAgent():
             logger.error(error_msg)
             raise ValueError(error_msg)
         # ------------------ SEARCH REQUEST ----------------------
-        res = requests.get(url, params={"q": query, "time_range": self.time_range,"format": "json"})
+        url = SEARX_HOST + "/search"
+        res = requests.get(url, params=self._searxng_params())
         if res.status_code == 200:
             results_dict: dict = json.loads(res.text)
             results = results_dict.get("results", [])
             logger.debug(f"Searxng returned {len(results)} results")
             self.switch_and_retry = True # reset in case same instance is reused
+            # return `max_results` no. of results
             return [Result(**result) for result in results][:self.max_results]
         else:
             logger.error(f"Searxng response code {res.status_code}: {res.text}")
             if self.switch_and_retry:
+                self.switch_and_retry = False
                 logger.info("Retrying with DDGS")
+                self.ddgs_search(query)
+
+    
+    def _ddgs_params(self) -> dict:
+        mapping = {
+            "day": "d",
+            "month": "m",
+            "year": "y"
+        }
+        return {
+            "query": self.query,
+            "timelimit": mapping.get(self.time_range),
+            "max_results": self.max_results
+        }
+
+
+    def ddgs_search(self, query: Optional[str] = None) -> List[Result] | None:
+        if query is not None:
+            self.query = query
+        if not self.query.strip():
+            error_msg = "Search query cannot be NULL"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        try:
+            results = ddgs.DDGS().text(**self._ddgs_params())
+            res = [Result(**result) for result in results][:self.max_results]
+            if len(res) == 0:
+                raise ValueError("0 results returned from DDGS search")
+            self.switch_and_retry = True # reset in case same instance is reused
+        except Exception as e:
+            logger.error(f"DDGS search error: {e}")
+            if self.switch_and_retry:
+                self.switch_and_retry = False
+                logger.info("Retrying with SEARXNG")
+                self.searxng_search(query)
 
 
 
-
-
+# -----------------------------------------------------------------------
 
 
 

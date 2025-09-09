@@ -2,7 +2,7 @@ import json
 import logging
 from io import BytesIO
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 import ddgs
 import requests
 import trafilatura
@@ -133,6 +133,7 @@ class WebSearchAgent():
             if len(res) == 0:
                 raise ValueError("0 results returned from DDGS search")
             self.switch_and_retry = True # reset in case same instance is reused
+            return res
         except Exception as e:
             logger.error(f"DDGS search error: {e}")
             if self.switch_and_retry:
@@ -146,61 +147,94 @@ class WebSearchAgent():
 
 
 
-def fetch_rendered_text(url: str) -> str | None:
+def fetch_rendered_text(urls: Dict[int, str]) -> Dict:
     """Attempt to fetch a JS-rendered webpage with Playwright and clean it using Trafilatura."""
+    content = {}
     with sync_playwright() as p:
-        print("[ launching chromium browser instance ]")
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.goto(url, wait_until="networkidle")  # wait until network is idle
-        html = page.content()  # get fully rendered HTML
+        logger.info("Launching chromium browser instance")
+        for index in urls:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(urls[index], wait_until="networkidle")  # wait until network is idle
+            html = page.content()  # get fully rendered HTML
+            text = trafilatura.extract(html, url)
+            content[index] = text
         browser.close()
+        logger.info("Closing chromium browser instance")
+    return content
 
-    # Pass rendered HTML to Trafilatura
-    text = trafilatura.extract(html, url)
-    return text
+
+class UrlContent():
+    def __init__(self, n: int):
+        self.text = {} if n > 1 else ""
+        self.index = 0
+        self.pw_queue = {}
+
+    def add_text(self, text: str):
+        if isinstance(self.text, dict):
+            self.text[self.index] = text
+            self.index += 1
+        else:
+            self.text += text
+    
+    def add_to_queue(self, url: str):
+        self.pw_queue[self.index] = url
+        self.index += 1
+
+    def dump(self) -> str | dict:
+        if self.pw_queue:
+            content = fetch_rendered_text(self.pw_queue)
+            self.text.update(content)
+        return self.text
 
 
 # SUB-TOOL
-def get_url_content(url: str) -> str:
-    """Extract **text** content from url
+def get_url_content(url: str | List[str]) -> str | Dict[int, str]:
+    """Gets text content from the webpage at the url
+
     Args:
-        url (str): web page url
+        url (str | List[str]): Web page address.
 
     Returns:
-        str: text content from web page
+        str | Dict[int, str]: Text content from the webpage.
     """
+    if isinstance(url, str):
+        url = [url]
+    n = len(url)
+    content = UrlContent(n)
 
-    # HEAD request to check content type (like curl -I -L -A)
-    head: requests.Response = requests.head(
-        url, headers=HEADERS, allow_redirects=True, timeout=15
-    )
-    content_type: str = head.headers.get("Content-Type", "").lower()
-
-    # Case 1: PDF
-    if "pdf" in content_type:
-        print("[ pdf detected ]")
-        r: requests.Response = requests.get(
-            url, headers=HEADERS, allow_redirects=True, timeout=30
+    while n > 0:
+        # HEAD request to check content type (like curl -I -L -A)
+        head: requests.Response = requests.head(
+            url[-n], headers=HEADERS, allow_redirects=True, timeout=15
         )
-        text = extract_text(BytesIO(r.content))
-        return text.strip()
+        content_type: str = head.headers.get("Content-Type", "").lower()
+        # Case 1: PDF
+        if "pdf" in content_type:
+            logger.debug("PDF detected")
+            r = requests.get(
+                url, headers=HEADERS, allow_redirects=True, timeout=30
+            )
+            # use pdfminer to extract text
+            text = extract_text(BytesIO(r.content)) 
+            content.add_text(text)
 
-    # Case 2: HTML or other text-based
-    else:
-        downloaded = trafilatura.fetch_url(url)
-        if downloaded:
-            text = trafilatura.extract(downloaded)
-            if text:
-                if (
-                    "enable javascript" in text.lower()
-                    or "javascript to run this app" in text.lower()
-                ):
-                    text = fetch_rendered_text(url) or ""
-                return text.strip()
-
-    # Case 3: Fallback → Playwright (JS-heavy site)
-    return fetch_rendered_text(url) or ""
+        # Case 2: HTML or other text-based
+        else:
+            downloaded = trafilatura.fetch_url(url)
+            if downloaded:
+                text = trafilatura.extract(downloaded)
+                if text:
+                    if (
+                        "enable javascript" in text.lower()
+                        or "javascript to run this app" in text.lower()
+                    ):
+                        logger.debug(f"JS site: {url}")
+                        content.add_to_queue(url)
+                else:
+                    # fallback to playwright
+                    content.add_to_queue(url)
+        return content.dump()
 
 
 # MAIN-TOOL

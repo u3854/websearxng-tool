@@ -65,18 +65,22 @@ class WebSearchAgent:
         self.agent_func = self._check_agent(agent)
 
     def _check_agent(self, agent: _AGENTS):
-        if agent == "ddgs": return self.ddgs_search
+        if agent == "ddgs": 
+            return self.ddgs_search
         try:
             res = requests.get(SEARX_HOST + "/config", timeout=2)
-            if res.ok and ("engines" in res.text): return self.searxng_search
-        except requests.exceptions.ConnectionError: pass
+            if res.ok and ("engines" in res.text): 
+                return self.searxng_search
+        except requests.exceptions.ConnectionError: 
+            pass
         return self.ddgs_search
         
     def _searxng_params(self) -> dict:
         return {"q": self.query, "format": "json", "time_range": self.time_range}
 
     def searxng_search(self, query: Optional[str] = None) -> List[Result]:
-        if query: self.query = query
+        if query: 
+            self.query = query
         try:
             res = requests.get(SEARX_HOST + "/search", params=self._searxng_params())
             if res.status_code == 200:
@@ -97,7 +101,8 @@ class WebSearchAgent:
         return {"query": self.query, "timelimit": mapping.get(self.time_range), "max_results": self.max_results}
 
     def ddgs_search(self, query: Optional[str] = None) -> List[Result]:
-        if query: self.query = query
+        if query: 
+            self.query = query
         try:
             results = ddgs.DDGS().text(**self._ddgs_params())
             res = [Result(**r) for r in results][:self.max_results]
@@ -112,7 +117,8 @@ class WebSearchAgent:
 
 def fetch_rendered_text(urls: Dict[int, str]) -> Dict:
     content = {}
-    if not urls: return content
+    if not urls: 
+        return content
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(user_agent=HEADERS["User-Agent"])
@@ -137,8 +143,10 @@ class UrlContent:
         self.is_dict = n > 1
 
     def add_text(self, text: str):
-        if self.is_dict: self.text[self.index] = text
-        else: self.text = text
+        if self.is_dict: 
+            self.text[self.index] = text
+        else: 
+            self.text = text
         self.index += 1
     
     def add_to_queue(self, url: str):
@@ -148,9 +156,11 @@ class UrlContent:
     def dump(self) -> Union[str, Dict]:
         if self.pw_queue:
             content = fetch_rendered_text(self.pw_queue)
-            if self.is_dict: self.text.update(content)
+            if self.is_dict: 
+                self.text.update(content)
             else: 
-                if 0 in content: self.text = content[0]
+                if 0 in content: 
+                    self.text = content[0]
         return self.text
 
 # --- UPDATED MCP TOOLS ---
@@ -177,11 +187,11 @@ def get_url_content(urls: Union[str, List[str]]) -> str:
             try:
                 parsed = json.loads(cleaned)
                 url_list = parsed if isinstance(parsed, list) else [cleaned]
-            except:
+            except Exception:
                 try:
                     parsed = json.loads(cleaned.replace("'", '"'))
                     url_list = parsed if isinstance(parsed, list) else [cleaned]
-                except:
+                except Exception:
                     url_list = [cleaned]
         elif "," in cleaned:
              url_list = [u.strip() for u in cleaned.split(",") if u.strip()]

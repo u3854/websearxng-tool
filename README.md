@@ -108,9 +108,3 @@ uv run python -m websearx_tool.server
 
 * **SearXNG Host:** Set the `SEARXNG_HOST` environment variable to point to your instance.
 * Default: `http://127.0.0.1:8080`
-
-
-
-```
-
-```

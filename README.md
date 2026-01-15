@@ -1,6 +1,6 @@
 # WebSearx
 
-A flexible and simple web search and scraping tool that works as a Python library, a CLI utility, and an MCP server. (Not fully tested, just a side project)
+A flexible and simple web search and scraping tool that works as a Python library, a CLI utility, and an MCP server. (Not fully tested, not in active development)
 
 ## Features
 
@@ -27,7 +27,7 @@ playwright install chromium
 
 ```
 
-### Option 2: Local Development (For contributors)
+### Option 2: Local Development
 
 This project is managed with `uv`.
 

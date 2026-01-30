@@ -1,4 +1,4 @@
-(Note: Large parts of the project are **AI-generated**. I just didn't want to keep it in a perpetual WIP state. Not fully tested, not being actively worked on, so some manual intervention might be needed to run smoothly.)
+(**NOTE**: Large parts of the project are **AI-generated**. I just didn't want to keep it in a perpetual WIP state. Not fully tested, not being actively worked on, so some manual intervention might be needed to run smoothly.)
 
 # 🌐 WebSearx
 
@@ -99,8 +99,9 @@ To use WebSearx with Claude Desktop, add this to your `claude_desktop_config.jso
 ## 🏗 Architecture
 
 1. **Search Layer:** Queries SearXNG (Local) -> DuckDuckGo (Cloud Fallback).
-2. **Extraction Layer:** * `smart_fetch`: Checks headers. If PDF or static HTML, extracts immediately.
-* `browser_fetch`: If `smart_fetch` fails or finds "JS Required" signals, it spawns a headless browser.
+2. **Extraction Layer:** 
+    * `smart_fetch`: Checks headers. If PDF or static HTML, extracts immediately.
+    * `browser_fetch`: If `smart_fetch` fails or finds "JS Required" signals, it spawns a headless browser.
 
 
 3. **Interface Layer:** CLI (Rich), MCP (JSON-RPC), or Python API.

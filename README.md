@@ -1,110 +1,129 @@
-# WebSearx
+(Note: Large parts of the project are **AI-generated**. I just didn't want to keep it in a perpetual WIP state. Not fully tested, not being actively worked on, so some manual intervention might be needed to run smoothly.)
 
-A flexible and simple web search and scraping tool that works as a Python library, a CLI utility, and an MCP server. (Not fully tested, not in active development)
+# 🌐 WebSearx
 
-## Features
+**WebSearx** is an all-in-one web search and scraping suite. It functions as a high-performance Python library, a CLI utility, and a Model Context Protocol (MCP) server for LLMs (like Claude).
 
-* **Search Engine Agnostic:** Defaults to SearXNG (if available), falls back to DuckDuckGo (ddgs).
-* **Smart Scraping:** Attempts fast scraping (Requests/Trafilatura) first, falls back to headless browser (Playwright) for JS-heavy sites.
-* **PDF Support:** Automatically detects and extracts text from PDF URLs.
-* **Dual Interface:** Run as a command-line tool or an MCP server for LLMs.
-* **Format Options:** Output human-readable rich text or raw JSON.
+## Key Features
 
-## Installation
+* **Self-Hosted Search:** Bundled `docker-compose` setup for SearXNG + Redis.
+* **Privacy First:** Defaults to local SearXNG; falls back to DuckDuckGo (ddgs) if SearXNG is offline.
+* **Hybrid Scraping:** 
+    * **Fast Track:** Uses `trafilatura` for lightning-fast static extraction.
+    * **Deep Track:** Automatically triggers `Playwright` (Headless Chromium) for JS-heavy or protected sites.
 
-### Option 1: Install from GitHub (Recommended for users)
-You can install this directly into your environment using pip:
+
+* **PDF Intelligence:** Native text extraction for PDF links.
+* **MCP Ready:** Plug it straight into Claude Desktop or any MCP-compatible client.
+
+---
+
+## 🚀 Quick Start (Docker - Recommended)
+
+The fastest way to get the full stack (App + Search Engine) running is via Docker:
 
 ```bash
-pip install "git+[https://github.com/u3854/websearxng-tool.git](https://github.com/u3854/websearxng-tool.git)"
+# 1. Clone and navigate
+git clone https://github.com/u3854/websearxng-tool.git
+cd websearxng-tool
+
+# 2. Spin up the stack
+docker-compose up -d
 
 ```
 
-**Post-Install:** You must install the browser binaries for the scraper to work on JS-heavy sites:
+**What this does:**
+
+* Starts **SearXNG** (Search Engine) at `http://localhost:8080`
+* Starts **Redis** (Search Cache)
+* Starts the **WebSearx App** container, pre-configured to use the internal SearXNG.
+
+---
+
+## 🛠 Manual Installation
+
+### Option 1: Via Pip
 
 ```bash
+pip install "git+https://github.com/u3854/websearxng-tool.git"
 playwright install chromium
 
 ```
 
-### Option 2: Local Development
-
-This project is managed with `uv`.
+### Option 2: Local Development (uv)
 
 ```bash
 uv sync
+uv run playwright install chromium
 
 ```
 
-## CLI Usage
+---
 
-If installed via pip, use `websearx`. If using uv, use `uv run websearx`.
+## 💻 Usage
 
-### Searching
+### 1. Command Line (CLI)
+
+The CLI automatically switches between a clean "Rich" UI and raw JSON.
 
 ```bash
-# Basic search
-websearx "python async tutorial"
+# Basic Search
+websearx "current nvidia stock price"
 
-# Search and scrape the top 3 results
-websearx "latest ai news" --scrape --limit 3
+# Search + Deep Scrape (Visits the websites to get full text)
+websearx "latest spacex launch" --scrape --limit 3
 
-# Filter by time (day, month, year)
-websearx "stock market" --time day
-
-```
-
-### Scraping
-
-```bash
-# Scrape one or more URLs directly
-websearx scrape [https://example.com](https://example.com) [https://another.com](https://another.com)
+# Direct Scraping
+websearx scrape https://docs.python.org/3/
 
 ```
 
-### JSON Output
+### 2. MCP Server (For AI Agents)
 
-Add `--json` to any command to get raw JSON output (useful for piping to `jq`).
+To use WebSearx with Claude Desktop, add this to your `claude_desktop_config.json`:
 
-```bash
-websearx "linux commands" --json
-
-```
-
-## Library Usage
-
-You can import the core functions directly into your Python scripts:
-
-```python
-from websearx_tool.tools import web_search, get_url_content
-
-# Search (returns list of dicts)
-results = web_search("manchester united", limit=3)
-
-# Scrape (returns dict of {index: text})
-content = get_url_content(["[https://example.com](https://example.com)"])
+```json
+{
+  "mcpServers": {
+    "websearx": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "--network", "searx_net", "websearx_app"]
+    }
+  }
+}
 
 ```
 
-## MCP Server Usage
+---
 
-To use this as a Model Context Protocol (MCP) server:
+## 🏗 Architecture
 
-```bash
-# If installed via pip
-python -m websearx_tool.server
+1. **Search Layer:** Queries SearXNG (Local) -> DuckDuckGo (Cloud Fallback).
+2. **Extraction Layer:** * `smart_fetch`: Checks headers. If PDF or static HTML, extracts immediately.
+* `browser_fetch`: If `smart_fetch` fails or finds "JS Required" signals, it spawns a headless browser.
 
-# If using uv
-uv run python -m websearx_tool.server
 
-```
+3. **Interface Layer:** CLI (Rich), MCP (JSON-RPC), or Python API.
 
-### Available Tools
+---
 
-* `web_search(query, time_range, full_content, max_results)`
-* `get_url_content(urls)`
+## ⚙️ Configuration
 
-## Configuration
+WebSearx uses environment variables for easy config:
 
-* **SearXNG Host:** Set the `SEARXNG_HOST` environment variable to point to your instance.
-* Default: `http://127.0.0.1:8080`
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SEARXNG_HOST` | URL of your SearXNG instance | `http://127.0.0.1:8080` |
+| `CURL_CFFI_LOG_LEVEL` | Suppress noisy library logs | `ERROR` |
+
+---
+
+## ⚖️ Licensing & Open Source
+
+This project is open-source. It orchestrates several powerful tools:
+
+* **SearXNG:** AGPL-3.0
+* **Trafilatura:** GPL-3.0
+* **Playwright:** Apache-2.0
+
+As a `docker-compose` aggregation, you can use and modify this stack freely for personal or research use.

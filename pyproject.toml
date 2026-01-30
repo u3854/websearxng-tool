@@ -7,13 +7,13 @@ requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.13.4",
     "ddgs>=9.5.2",
-    "fastmcp>=2.14.2",
-    "mcp>=1.25.0",
+    "fastmcp>=1.0.0", # Simplified to stable
+    "mcp>=1.0.0",
     "pdfminer-six>=20240706",
-    "playwright>=1.54.0",
-    "pydantic>=2.11.7",
+    "playwright>=1.50.0",
+    "pydantic>=2.0.0",
     "requests>=2.32.4",
-    "rich>=14.2.0",
+    "rich>=14.0.0",
     "trafilatura>=2.0.0",
 ]
 
@@ -23,6 +23,7 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 websearx = "websearx_tool.cli:main"
+websearx-server = "websearx_tool.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/websearx_tool"]

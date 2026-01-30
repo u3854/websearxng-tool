@@ -1,0 +1,45 @@
+services:
+  # 1. Your Python Tool (App)
+  app:
+    build: .
+    container_name: websearx_app
+    environment:
+      - SEARXNG_HOST=http://searxng:8080
+    depends_on:
+      - searxng
+    networks:
+      - searx_net
+    ports:
+      - "8000:8000"
+
+  # 2. SearXNG Engine
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: always
+    networks:
+      - searx_net
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-replaceme} # this is taken from .env file
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml
+    depends_on:
+      - redis
+
+  # 3. Redis (Cache for SearXNG)
+  redis:
+    image: redis:alpine
+    container_name: searx_redis
+    networks:
+      - searx_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  searx_net:
+    driver: bridge

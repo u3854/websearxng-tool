@@ -1,0 +1,22 @@
+use_default_settings: true
+
+server:
+  # base_url is required for the engine to handle internal routing
+  base_url: http://localhost:8080/
+  image_proxy: true
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  # Ensure the JSON format is explicitly listed
+  formats:
+    - html
+    - json
+
+engines:
+  - name: google
+    engine: google
+  - name: duckduckgo
+    engine: duckduckgo
+  - name: wikipedia
+    engine: wikipedia

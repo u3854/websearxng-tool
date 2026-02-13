@@ -3,6 +3,7 @@ import json
 import sys
 import logging
 import os
+import asyncio  # Required for async execution
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
@@ -13,11 +14,13 @@ from rich.box import ROUNDED
 os.environ["CURL_CFFI_LOG_LEVEL"] = "ERROR"
 logging.basicConfig(level=logging.CRITICAL)
 
+# We import the now-async functions from tools
 from websearx_tool.tools import web_search, get_url_content  # noqa: E402
 
 console = Console()
 
 def display_results(results, is_search=True):
+    """Handles the Rich-based UI rendering."""
     if not results:
         console.print("[yellow]No data found.[/yellow]")
         return
@@ -26,7 +29,10 @@ def display_results(results, is_search=True):
         for i, res in enumerate(results, 1):
             content = [Text(res.get('snippet', ''), style="bright_white")]
             if res.get('full_content'):
-                content.extend([Text("\n--- Scraped ---\n", style="bold cyan"), Markdown(res['full_content'])])
+                content.extend([
+                    Text("\n--- Scraped ---\n", style="bold cyan"), 
+                    Markdown(res['full_content'])
+                ])
             
             console.print(Panel(
                 Group(*content),
@@ -38,9 +44,15 @@ def display_results(results, is_search=True):
         # Scrape display logic
         data = results if isinstance(results, dict) else {0: results}
         for idx, text in data.items():
-            console.print(Panel(Markdown(text), title=f"Source {idx}", box=ROUNDED, border_style="magenta"))
+            console.print(Panel(
+                Markdown(text), 
+                title=f"Source {idx}", 
+                box=ROUNDED, 
+                border_style="magenta"
+            ))
 
-def main():
+async def main_async():
+    """Async entry point for logic execution."""
     parser = argparse.ArgumentParser(description="WebSearch Tool")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -65,17 +77,26 @@ def main():
         return
 
     if args.command == "search":
-        res = web_search(args.query, args.time, args.scrape, args.limit)
+        # Awaiting the async search call
+        res = await web_search(args.query, args.time, args.scrape, args.limit)
         if args.json: 
             print(json.dumps(res, indent=2))
         else: 
             display_results(res)
     else:
-        res = get_url_content(args.urls)
+        # Awaiting the async scrape call
+        res = await get_url_content(args.urls)
         if args.json: 
             print(json.dumps(res, indent=2))
         else: 
             display_results(res, is_search=False)
+
+def main():
+    """Synchronous wrapper to start the asyncio loop."""
+    try:
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

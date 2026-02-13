@@ -2,11 +2,12 @@ import logging
 import os
 import requests
 import trafilatura
+import asyncio
 from io import BytesIO
 from typing import Dict, List, Optional, Union
 from ddgs import DDGS
 from pdfminer.high_level import extract_text
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger("websearx_tool")
@@ -74,21 +75,26 @@ def smart_fetch(url: str) -> Optional[str]:
         logger.debug(f"Smart fetch skipped {url}: {e}")
     return None
 
-def browser_fetch(urls: Dict[int, str]) -> Dict[int, str]:
+async def browser_fetch(urls: Dict[int, str]) -> Dict[int, str]:
     results = {}
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(user_agent=HEADERS["User-Agent"])
-        for idx, url in urls.items():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(user_agent=HEADERS["User-Agent"])
+        
+        async def fetch_one(idx, url):
             try:
-                page = context.new_page()
-                page.goto(url, wait_until="domcontentloaded", timeout=15000)
-                results[idx] = trafilatura.extract(page.content()) or ""
-                page.close()
+                page = await context.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                content = await page.content()
+                results[idx] = trafilatura.extract(content) or ""
+                await page.close()
             except Exception as e:
                 logger.error(f"Playwright failed for {url}: {e}")
                 results[idx] = ""
-        browser.close()
+
+        # Run fetches concurrently
+        await asyncio.gather(*(fetch_one(idx, url) for idx, url in urls.items()))
+        await browser.close()
     return results
 
 class UrlContent:
@@ -109,9 +115,9 @@ class UrlContent:
         self.pw_queue[self.index] = url
         self.index += 1
 
-    def dump(self) -> Union[str, Dict]:
+    async def dump(self) -> Union[str, Dict]:
         if self.pw_queue:
-            rendered = browser_fetch(self.pw_queue)
+            rendered = await browser_fetch(self.pw_queue)
             if self.is_dict: 
                 self.text.update(rendered)
             elif 0 in rendered: 

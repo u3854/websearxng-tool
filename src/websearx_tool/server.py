@@ -13,19 +13,22 @@ for lib in ["httpcore", "httpx", "trafilatura", "playwright"]:
 mcp = FastMCP("WebSearchScraper")
 
 @mcp.tool()
-def scrape_urls(urls: List[str]) -> str:
+async def scrape_urls(urls: List[str]) -> str:
     """Extracts text content from a list of URLs."""
-    return json.dumps(run_scrape(urls))
+    # Added 'await' here
+    result = await run_scrape(urls) 
+    return json.dumps(result)
 
 @mcp.tool()
-def web_search(
+async def web_search(
     query: str,
     time_range: Optional[Literal["day", "month", "year"]] = None,
     full_content: bool = False,
     max_results: int = 5,
 ) -> str:
     """Search the web and optionally scrape full content."""
-    results = run_search(query, time_range, full_content, max_results)
+    # Added 'await' here
+    results = await run_search(query, time_range, full_content, max_results)
     return json.dumps(results, indent=2) if results else "No results found."
 
 def main():
